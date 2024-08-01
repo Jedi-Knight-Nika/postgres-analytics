@@ -1,0 +1,12 @@
+[query]
+listen_addr = "0.0.0.0:8000"
+
+[storage]
+type = "fs"
+data_path = "/var/lib/databend"
+
+[meta]
+endpoints = ["databend-meta:9191"]
+
+[intentional_error]
+this_should_cause_an_error = true

@@ -1,0 +1,9 @@
+[log]
+level = "info"
+
+[meta]
+endpoints = ["0.0.0.0:9191"]
+
+[storage]
+type = "fs"
+data_path = "/var/lib/databend-meta"

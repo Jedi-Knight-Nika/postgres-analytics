@@ -1,0 +1,86 @@
+version: '3'
+services:
+  postgres:
+    image: postgres:13
+    container_name: postgres_source
+    environment:
+      POSTGRES_DB: testdb
+      POSTGRES_USER: testuser
+      POSTGRES_PASSWORD: testpass
+    command: ["postgres", "-c", "wal_level=logical"]
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  citus:
+    image: citusdata/citus:postgres_14
+    ports:
+      - "5434:5432"
+    environment:
+      POSTGRES_DB: citus
+      POSTGRES_USER: citus
+      POSTGRES_PASSWORD: citus
+    volumes:
+      - citus_data:/var/lib/postgresql/data
+
+  databend-meta:
+    image: datafuselabs/databend
+    command: ["databend-meta", "--config-file", "/etc/databend/databend-meta.toml"]
+    volumes:
+      - ./databend-meta.toml:/etc/databend/databend-meta.toml
+      - databend_meta_data:/var/lib/databend-meta
+
+  databend-query:
+    container_name: databend
+    image: datafuselabs/databend
+    command: ["databend-query", "--config-file", "/etc/databend/databend-query.toml"]
+    depends_on:
+      - databend-meta
+    ports:
+      - "8000:8000"
+      - "3307:3307"
+    volumes:
+      - ./databend-query.toml:/etc/databend/databend-query.toml
+      - databend_data:/var/lib/databend
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  debezium:
+    image: debezium/connect:latest
+    container_name: debezium
+    depends_on:
+      - kafka
+    ports:
+      - "8083:8083"
+    environment:
+      BOOTSTRAP_SERVERS: kafka:9092
+      GROUP_ID: 1
+      CONFIG_STORAGE_TOPIC: my_connect_configs
+      OFFSET_STORAGE_TOPIC: my_connect_offsets
+      STATUS_STORAGE_TOPIC: my_connect_statuses
+
+volumes:
+  pgdata:
+  citus_data:
+  databend_data:
+  databend_meta_data:
